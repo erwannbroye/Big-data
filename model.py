@@ -60,33 +60,28 @@ class KnnRecommender:
 
         for title, idx in hashmap.items():
             ratio = fuzz.ratio(title.lower(), fav_movie.lower())
-            if ratio >= 60:
+            if ratio >= 80:
                 match_tuple.append((title, idx, ratio))
 
         match_tuple = sorted(match_tuple, key=lambda x: x[2])[::-1]
-        print (match_tuple)
         if not match_tuple:
             print('Oops! No match is found')
+            exit()
         else:
             print('Found possible matches in our database: '
                   '{0}\n'.format([x[0] for x in match_tuple]))
             return match_tuple[0][1]
 
-    def _inference(self, model, data, hashmap,
-                   fav_movie, n_recommendations):
-        # fit
+    def _inference(self, model, data, hashmap, fav_movie, n_recommendations):
         model.fit(data)
-        # get input movie index
+
         print('You have input movie:', fav_movie)
         idx = self._fuzzy_matching(hashmap, fav_movie)
-        # inference
-        print('Recommendation system start to make inference')
+
         print('......\n')
-        t0 = time.time()
         distances, indices = model.kneighbors(
             data[idx],
             n_neighbors=n_recommendations+1)
-        # get list of raw idx of recommendations
         raw_recommends = \
             sorted(
                 list(
@@ -97,21 +92,16 @@ class KnnRecommender:
                 ),
                 key=lambda x: x[1]
             )[:0:-1]
-        print('It took my system {:.2f}s to make inference \n\
-              '.format(time.time() - t0))
-        # return recommendation (movieId, distance)
         return raw_recommends
 
     def make_recommendations(self, fav_movie, n_recommendations):
-        # get data
         movie_user_mat_sparse, hashmap = self._prep_data()
-        # get recommendations
         raw_recommends = self._inference(
             self.model, movie_user_mat_sparse, hashmap,
             fav_movie, n_recommendations)
-        # print results
         reverse_hashmap = {v: k for k, v in hashmap.items()}
-        print('Recommendations for {}:'.format(fav_movie))
+        print('Recommendations for ' + fav_movie + ':')
+
         for i, (idx, dist) in enumerate(raw_recommends):
             print('{0}: {1}, with distance '
                   'of {2}'.format(i+1, reverse_hashmap[idx], dist))
@@ -126,21 +116,19 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
-    # get args
-    args = parse_args()
-    data_path = "./ml-latest"
-    movies_filename = 'movies.csv'
-    ratings_filename = 'ratings.csv'
-    movie_name = args.movie_name
-    top_n = args.top_n
-    # initial recommender system
-    recommender = KnnRecommender(
-        os.path.join(data_path, movies_filename),
-        os.path.join(data_path, ratings_filename))
-    # set params
-    recommender.set_filter_params(50, 50)
-    recommender.set_model_params(20 , 'auto', 'cosine')
-    # make recommendations
-    recommender.make_recommendations(movie_name, top_n)
+args = parse_args()
+data_path = "./ml-latest-small"
+movies_filename = 'movies.csv'
+ratings_filename = 'ratings.csv'
+movie_name = args.movie_name
+top_n = args.top_n
+
+recommender = KnnRecommender(
+    os.path.join(data_path, movies_filename),
+    os.path.join(data_path, ratings_filename))
+
+recommender.set_filter_params(50, 50)
+recommender.set_model_params(20 , 'auto', 'cosine')
+
+recommender.make_recommendations(movie_name, top_n)
 
