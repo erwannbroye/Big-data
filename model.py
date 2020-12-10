@@ -57,11 +57,16 @@ class KnnRecommender:
 
     def _fuzzy_matching(self, hashmap, fav_movie):
         match_tuple = []
+        match_tuple_60 = []
 
         for title, idx in hashmap.items():
             ratio = fuzz.ratio(title.lower(), fav_movie.lower())
             if ratio >= 80:
                 match_tuple.append((title, idx, ratio))
+            if ratio >= 60:
+                match_tuple_60.append((title, idx, ratio))
+        if not match_tuple:
+            match_tuple = match_tuple_60
 
         match_tuple = sorted(match_tuple, key=lambda x: x[2])[::-1]
         if not match_tuple:
