@@ -1,10 +1,13 @@
+#!/bin/python3
 import os
 import argparse
 
 import pandas as pd
+import numpy as np
 from scipy.sparse import csr_matrix
 from sklearn.neighbors import NearestNeighbors
 from fuzzywuzzy import fuzz
+import matplotlib.pyplot as plt
 
 data_path = "./ml-latest-small"
 movies_filename = 'movies.csv'
@@ -102,9 +105,18 @@ class KnnRecommender:
 
         print('Recommendations for ' + fav_movie + ':')
 
+        bars = []
+        height = []
         for i, (idx, dist) in enumerate(raw_recommends):
             print('{0}: {1}, with distance '
                   'of {2}'.format(i+1, reverse_hashmap[idx], dist))
+            bars.append(reverse_hashmap[idx])
+            height.append(dist)
+        y_pos = np.arange(len(bars))
+        plt.bar(y_pos, height)
+        plt.xticks(y_pos, bars, color='black', rotation=80 , fontsize='9', horizontalalignment='right')
+        plt.subplots_adjust(bottom=0.4)
+        plt.show()
 
 
 def parse_args():
