@@ -106,6 +106,8 @@ class KnnRecommender:
             height.append(dist)
         y_pos = np.arange(len(bars))
         plt.bar(y_pos, height)
+        plt.ylabel('Score')
+        plt.title('Recommendations based on ' + fav_movie)
         plt.xticks(y_pos, bars, color='black', rotation=80 , fontsize='9', horizontalalignment='right')
         plt.subplots_adjust(bottom=0.4)
         plt.show()
