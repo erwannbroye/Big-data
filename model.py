@@ -31,9 +31,7 @@ class KnnRecommender:
         ratings = pd.read_csv(os.path.join(self.path_ratings))
         tags = pd.read_csv(os.path.join(self.path_movies))
 
-        movies_count = pd.DataFrame(
-            ratings.groupby('movieId').size(),
-            columns=['count'])
+        movies_count = pd.DataFrame(ratings.groupby('movieId').size(), columns=['count'])
         popular_movies = list(set(movies_count.query('count >= @self.movie_rating_thres').index))
         movies_filter = ratings.movieId.isin(popular_movies).values
 
@@ -42,9 +40,7 @@ class KnnRecommender:
         tag_sorted = tags.loc[tags['genres'] == movie_tag]['movieId'].tolist()
         tag_filter = ratings.movieId.isin(tag_sorted).values
 
-        users_count = pd.DataFrame(
-            ratings.groupby('userId').size(),
-            columns=['count'])
+        users_count = pd.DataFrame(ratings.groupby('userId').size(), columns=['count'])
         active_users = list(set(users_count.query('count >= @self.user_rating_thres').index))
         users_filter = ratings.userId.isin(active_users).values
 
@@ -68,7 +64,7 @@ class KnnRecommender:
             ratio = fuzz.ratio(title.lower(), fav_movie.lower())
             if ratio >= 80:
                 match_tuple.append((title, idx, ratio))
-            if ratio >= 60:
+            elif ratio >= 60:
                 match_tuple_60.append((title, idx, ratio))
         if not match_tuple:
             match_tuple = match_tuple_60
@@ -78,8 +74,7 @@ class KnnRecommender:
             print('No match is found for : ' + fav_movie + ('' if movie_tag == '' else ' and tag ' + movie_tag))
             exit()
         else:
-            print('Found possible matches in our database: '
-                  '{0}\n'.format([x[0] for x in match_tuple]))
+            print('Found possible matches in our database: {0}\n'.format([x[0] for x in match_tuple]))
             return match_tuple[0][1]
 
     def KNeighors(self, model, data, hashmap, fav_movie, n_recommendations, movie_tag):
@@ -106,8 +101,7 @@ class KnnRecommender:
         bars = []
         height = []
         for i, (idx, dist) in enumerate(raw_recommends):
-            print('{0}: {1}, with distance '
-                  'of {2}'.format(i+1, reverse_hashmap[idx], dist))
+            print('{0}: {1}, with distance of {2}'.format(i+1, reverse_hashmap[idx], dist))
             bars.append(reverse_hashmap[idx])
             height.append(dist)
         y_pos = np.arange(len(bars))
