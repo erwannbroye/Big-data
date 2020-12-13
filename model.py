@@ -47,8 +47,6 @@ class KnnRecommender:
             columns=['count'])
         active_users = list(set(users_count.query('count >= @self.user_rating_thres').index))
         users_filter = ratings.userId.isin(active_users).values
-        print(len(users_filter))
-        movie_user_mat = []
 
         if movie_tag == '':
             movie_user_mat = ratings[movies_filter & users_filter].pivot(index='movieId', columns='userId', values='rating').fillna(0)
@@ -62,7 +60,7 @@ class KnnRecommender:
         }
         return csr_matrix(movie_user_mat.values), hashmap
 
-    def FuzzyMatching(self, hashmap, fav_movie):
+    def FindMovie(self, hashmap, fav_movie, movie_tag):
         match_tuple = []
         match_tuple_60 = []
 
@@ -77,21 +75,21 @@ class KnnRecommender:
 
         match_tuple.sort(key=lambda ratio: ratio[2], reverse=True)
         if not match_tuple:
-            print('No match is found for : ' + fav_movie)
+            print('No match is found for : ' + fav_movie + ('' if movie_tag == '' else ' and tag ' + movie_tag))
             exit()
         else:
             print('Found possible matches in our database: '
                   '{0}\n'.format([x[0] for x in match_tuple]))
             return match_tuple[0][1]
 
-    def Inference(self, model, data, hashmap, fav_movie, n_recommendations):
+    def KNeighors(self, model, data, hashmap, fav_movie, n_recommendations, movie_tag):
         model.fit(data)
 
-        idx = self.FuzzyMatching(hashmap, fav_movie)
+        movie_list = self.FindMovie(hashmap, fav_movie, movie_tag)
 
         print('Making distance ......\n')
         distances, indices = model.kneighbors(
-            data[idx],
+            data[movie_list],
             n_neighbors=n_recommendations+1)
         return sorted(list(zip(
                         indices.squeeze().tolist(),
@@ -100,7 +98,7 @@ class KnnRecommender:
 
     def MakeRecommendations(self, fav_movie, n_recommendations, movie_tag):
         movie_user, hashmap = self.GetData(movie_tag)
-        raw_recommends = self.Inference(self.model, movie_user, hashmap, fav_movie, n_recommendations)
+        raw_recommends = self.KNeighors(self.model, movie_user, hashmap, fav_movie, n_recommendations, movie_tag)
         reverse_hashmap = {v: k for k, v in hashmap.items()}
 
         print('Recommendations for ' + fav_movie + ':')
@@ -134,6 +132,10 @@ args = parse_args()
 movie_name = args.movie_name
 top_n = args.top_n
 movie_tag = args.movie_tag
+
+if top_n <= 0:
+    print ("Argument error: top_n must be greater than 0")
+    exit()
 
 recommender = KnnRecommender(50, 50)
 
