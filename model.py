@@ -9,11 +9,13 @@ from fuzzywuzzy import fuzz
 data_path = "./ml-latest-small"
 movies_filename = 'movies.csv'
 ratings_filename = 'ratings.csv'
+tags_filename = 'tags.csv'
 
 class KnnRecommender:
-    def __init__(self, path_movies, path_ratings, movie_rating_thres, user_rating_thres):
-        self.path_movies = path_movies
-        self.path_ratings = path_ratings
+    def __init__(self, movie_rating_thres, user_rating_thres):
+        self.path_movies =  os.path.join(data_path, movies_filename)
+        self.path_ratings =  os.path.join(data_path, ratings_filename)
+        self.path_tags = os.path.join(data_path, tags_filename)
         self.movie_rating_thres = movie_rating_thres
         self.user_rating_thres = user_rating_thres
         self.model = NearestNeighbors()
@@ -21,9 +23,10 @@ class KnnRecommender:
     def SetModelParams(self, n_neighbors, algorithm, metric, n_jobs=None):
         self.model.set_params(**{'n_neighbors': n_neighbors, 'algorithm': algorithm, 'metric': metric})
 
-    def GetData(self):
+    def GetData(self, movie_tag):
         movies = pd.read_csv(os.path.join(self.path_movies))
         ratings = pd.read_csv(os.path.join(self.path_ratings))
+        tags = pd.read_csv(os.path.join(self.path_movies))
 
         movies_count = pd.DataFrame(
             ratings.groupby('movieId').size(),
@@ -31,13 +34,24 @@ class KnnRecommender:
         popular_movies = list(set(movies_count.query('count >= @self.movie_rating_thres').index))
         movies_filter = ratings.movieId.isin(popular_movies).values
 
+        tags["genres"]=tags["genres"].str.split("|")
+        tags = tags.explode("genres").reset_index(drop=True)
+        tag_sorted = tags.loc[tags['genres'] == movie_tag]['movieId'].tolist()
+        tag_filter = ratings.movieId.isin(tag_sorted).values
+
         users_count = pd.DataFrame(
             ratings.groupby('userId').size(),
             columns=['count'])
         active_users = list(set(users_count.query('count >= @self.user_rating_thres').index))
         users_filter = ratings.userId.isin(active_users).values
+        print(len(users_filter))
+        movie_user_mat = []
 
-        movie_user_mat = ratings[movies_filter & users_filter].pivot(index='movieId', columns='userId', values='rating').fillna(0)
+        if movie_tag == '':
+            movie_user_mat = ratings[movies_filter & users_filter].pivot(index='movieId', columns='userId', values='rating').fillna(0)
+        else:
+            movie_user_mat = ratings[movies_filter & users_filter & tag_filter].pivot(index='movieId', columns='userId', values='rating').fillna(0)
+
 
         mList = list(movies.set_index('movieId').loc[movie_user_mat.index].title)
         hashmap = {
@@ -81,8 +95,8 @@ class KnnRecommender:
                         distances.squeeze().tolist()
                     )), key=lambda x: x[1])[:0:-1]
 
-    def MakeRecommendations(self, fav_movie, n_recommendations):
-        movie_user, hashmap = self.GetData()
+    def MakeRecommendations(self, fav_movie, n_recommendations, movie_tag):
+        movie_user, hashmap = self.GetData(movie_tag)
         raw_recommends = self.Inference(self.model, movie_user, hashmap, fav_movie, n_recommendations)
         reverse_hashmap = {v: k for k, v in hashmap.items()}
 
@@ -97,6 +111,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--movie_name', nargs='?', default='',
                         help='provide your favoriate movie name')
+    parser.add_argument('--movie_tag', nargs='?', default='',
+                        help='provide your tag')
     parser.add_argument('--top_n', type=int, default=10,
                         help='top n movie recommendations')
     return parser.parse_args()
@@ -105,10 +121,11 @@ def parse_args():
 args = parse_args()
 movie_name = args.movie_name
 top_n = args.top_n
+movie_tag = args.movie_tag
 
-recommender = KnnRecommender(os.path.join(data_path, movies_filename), os.path.join(data_path, ratings_filename), 50, 50)
+recommender = KnnRecommender(50, 50)
 
 recommender.SetModelParams(20 , 'auto', 'cosine')
 
-recommender.MakeRecommendations(movie_name, top_n)
+recommender.MakeRecommendations(movie_name, top_n, movie_tag)
 
