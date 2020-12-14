@@ -15,12 +15,12 @@ ratings_filename = 'ratings.csv'
 tags_filename = 'tags.csv'
 
 class KnnRecommender:
-    def __init__(self, movie_rating_thres, user_rating_thres):
+    def __init__(self, movie_rating, user_rating):
         self.path_movies =  os.path.join(data_path, movies_filename)
         self.path_ratings =  os.path.join(data_path, ratings_filename)
         self.path_tags = os.path.join(data_path, tags_filename)
-        self.movie_rating_thres = movie_rating_thres
-        self.user_rating_thres = user_rating_thres
+        self.movie_rating = movie_rating
+        self.user_rating = user_rating
         self.model = NearestNeighbors()
 
     def SetModelParams(self, n_neighbors, algorithm, metric, n_jobs=None):
@@ -32,7 +32,7 @@ class KnnRecommender:
         tags = pd.read_csv(os.path.join(self.path_movies))
 
         movies_count = pd.DataFrame(ratings.groupby('movieId').size(), columns=['count'])
-        popular_movies = list(set(movies_count.query('count >= @self.movie_rating_thres').index))
+        popular_movies = list(set(movies_count.query('count >= @self.movie_rating').index))
         movies_filter = ratings.movieId.isin(popular_movies).values
 
         tags["genres"]=tags["genres"].str.split("|")
@@ -41,7 +41,7 @@ class KnnRecommender:
         tag_filter = ratings.movieId.isin(tag_sorted).values
 
         users_count = pd.DataFrame(ratings.groupby('userId').size(), columns=['count'])
-        active_users = list(set(users_count.query('count >= @self.user_rating_thres').index))
+        active_users = list(set(users_count.query('count >= @self.user_rating').index))
         users_filter = ratings.userId.isin(active_users).values
 
         if movie_tag == '':
@@ -73,41 +73,33 @@ class KnnRecommender:
         if not match_tuple:
             print('No match is found for : ' + fav_movie + ('' if movie_tag == '' else ' and tag ' + movie_tag))
             exit()
-        else:
-            print('Found possible matches in our database: {0}\n'.format([x[0] for x in match_tuple]))
-            return match_tuple[0][1]
+        return match_tuple[0][1], list([x[0] for x in match_tuple])
 
     def KNeighors(self, model, data, hashmap, fav_movie, n_recommendations, movie_tag):
         model.fit(data)
 
-        movie_list = self.FindMovie(hashmap, fav_movie, movie_tag)
+        movie_list, movie_list_name = self.FindMovie(hashmap, fav_movie, movie_tag)
 
-        print('Making distance ......\n')
-        distances, indices = model.kneighbors(
-            data[movie_list],
-            n_neighbors=n_recommendations+1)
+        distances, indices = model.kneighbors(data[movie_list], n_neighbors=n_recommendations+1)
         return sorted(list(zip(
                         indices.squeeze().tolist(),
                         distances.squeeze().tolist()
-                    )), key=lambda x: x[1])[:0:-1]
+                    )), key=lambda x: x[1])[:0:-1], movie_list_name
 
     def MakeRecommendations(self, fav_movie, n_recommendations, movie_tag):
         movie_user, hashmap = self.GetData(movie_tag)
-        raw_recommends = self.KNeighors(self.model, movie_user, hashmap, fav_movie, n_recommendations, movie_tag)
+        raw_recommends, movie_list_name = self.KNeighors(self.model, movie_user, hashmap, fav_movie, n_recommendations, movie_tag)
         reverse_hashmap = {v: k for k, v in hashmap.items()}
-
-        print('Recommendations for ' + fav_movie + ':')
 
         bars = []
         height = []
         for i, (idx, dist) in enumerate(raw_recommends):
-            print('{0}: {1}, with distance of {2}'.format(i+1, reverse_hashmap[idx], dist))
             bars.append(reverse_hashmap[idx])
             height.append(dist)
         y_pos = np.arange(len(bars))
         plt.bar(y_pos, height)
         plt.ylabel('Score')
-        plt.title('Recommendations based on ' + fav_movie)
+        plt.title('Recommendations based on ' + ', '.join(movie_list_name) + ('' if movie_tag == '' else ' and tag ' + movie_tag))
         plt.xticks(y_pos, bars, color='black', rotation=80 , fontsize='9', horizontalalignment='right')
         plt.subplots_adjust(bottom=0.4)
         plt.show()
@@ -134,8 +126,6 @@ if top_n <= 0:
     exit()
 
 recommender = KnnRecommender(50, 50)
-
 recommender.SetModelParams(20 , 'auto', 'cosine')
-
 recommender.MakeRecommendations(movie_name, top_n, movie_tag)
 
